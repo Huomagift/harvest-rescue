@@ -1,0 +1,6 @@
+.env
+venv/
+__pycache__/
+*.pyc
+harvest_rescue.db
+*.log
