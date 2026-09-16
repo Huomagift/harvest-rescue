@@ -30,6 +30,23 @@ def get_farm(farm_id: str, db: Session = Depends(get_db)):
     return farm
 
 
+@router.delete("/{farm_id}")
+def delete_farm(farm_id: str, db: Session = Depends(get_db)):
+    farm = db.query(models.Farm).filter(models.Farm.id == farm_id).first()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    if farm.is_demo:
+        raise HTTPException(status_code=400, detail="Demo farms cannot be deleted.")
+    
+    # Delete associated alerts, risk events, and reports
+    db.query(models.Alert).filter(models.Alert.farm_id == farm_id).delete()
+    db.query(models.RiskEvent).filter(models.RiskEvent.farm_id == farm_id).delete()
+    db.query(models.FarmerReport).filter(models.FarmerReport.farm_id == farm_id).delete()
+    db.delete(farm)
+    db.commit()
+    return {"id": farm_id, "status": "deleted"}
+
+
 @router.post("/{farm_id}/reports")
 def add_farmer_report(farm_id: str, report: schemas.FarmerReportCreate, db: Session = Depends(get_db)):
     farm = db.query(models.Farm).filter(models.Farm.id == farm_id).first()
