@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     backend_api_key: str
 
     # Comma-separated list in .env, parsed into a list here.
-    allowed_origins: str = "http://localhost:3000"
+    allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     # Google Cloud project tied to your Earth Engine account.
     gee_project_id: str | None = None

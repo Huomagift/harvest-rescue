@@ -12,6 +12,8 @@ fallback value instead of crashing the demo. Drop real NDVI values pulled
 manually from the GEE code editor into FALLBACK_NDVI_BY_FARM_NAME so the
 demo still runs on real numbers even if the live call isn't working yet.
 """
+import datetime
+
 import ee
 
 from app.services.external_call import call_with_fallback
@@ -42,12 +44,17 @@ def get_ndvi_signal(latitude: float, longitude: float, farm_name: str = "") -> d
     }
 
     def live_call() -> dict:
+        # NOTE: ee.Date.now() is JS Earth Engine API syntax and does not exist
+        # in the Python client. Build "today" from Python's own datetime instead,
+        # then wrap it as an ee.Date.
+        today = ee.Date(datetime.datetime.utcnow())
+
         point = ee.Geometry.Point([longitude, latitude])
 
         collection = (
             ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
             .filterBounds(point)
-            .filterDate(ee.Date.now().advance(-30, "day"), ee.Date.now())
+            .filterDate(today.advance(-30, "day"), today)
             .sort("system:time_start", False)
         )
 
@@ -63,7 +70,7 @@ def get_ndvi_signal(latitude: float, longitude: float, farm_name: str = "") -> d
         ).get("NDVI").getInfo()
 
         earlier = with_ndvi.filterDate(
-            ee.Date.now().advance(-30, "day"), ee.Date.now().advance(-14, "day")
+            today.advance(-30, "day"), today.advance(-14, "day")
         ).first()
         earlier_ndvi = earlier.select("NDVI").reduceRegion(
             reducer=ee.Reducer.mean(), geometry=point, scale=10
