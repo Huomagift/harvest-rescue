@@ -1,14 +1,21 @@
-import { Farm, FarmCreate, FarmerReportCreate, FarmerReportResponse, RiskEvent } from "./types";
+import {
+  Alert,
+  AlertStatus,
+  Farm,
+  FarmCreate,
+  FarmerReportCreate,
+  FarmerReportResponse,
+  RiskEvent,
+  SignalResponse,
+  SweepResult,
+} from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const BACKEND_API_KEY =
-  process.env.NEXT_PUBLIC_BACKEND_API_KEY || "604e89b1d82a1759554e71dffb59428ebc472936fd7aabadbe8863bcf4d4187b";
+const API_BASE_URL = "/api";
 
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "X-API-Key": BACKEND_API_KEY,
     ...(options.headers as Record<string, string>),
   };
 
@@ -54,6 +61,12 @@ export const api = {
     return apiFetch<Farm>(`/farms/${farmId}`);
   },
 
+  deleteFarm: (farmId: string): Promise<{ id: string; status: string }> => {
+    return apiFetch<{ id: string; status: string }>(`/farms/${farmId}`, {
+      method: "DELETE",
+    });
+  },
+
   submitFarmerReport: (farmId: string, report: FarmerReportCreate): Promise<FarmerReportResponse> => {
     return apiFetch<FarmerReportResponse>(`/farms/${farmId}/reports`, {
       method: "POST",
@@ -71,4 +84,34 @@ export const api = {
   getLatestRisk: (farmId: string): Promise<RiskEvent[]> => {
     return apiFetch<RiskEvent[]>(`/risk/${farmId}/latest`);
   },
+
+  getSignals: (farmId: string): Promise<SignalResponse> => {
+    return apiFetch<SignalResponse>(`/risk/${farmId}/signals`);
+  },
+
+  triggerSweep: (): Promise<SweepResult> => {
+    return apiFetch<SweepResult>("/risk/sweep", {
+      method: "POST",
+    });
+  },
+
+  // Alert endpoints
+  listAlerts: (status?: string): Promise<Alert[]> => {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    return apiFetch<Alert[]>(`/alerts/${query}`);
+  },
+
+  getFarmAlerts: (farmId: string, status?: string): Promise<Alert[]> => {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    return apiFetch<Alert[]>(`/alerts/farm/${farmId}${query}`);
+  },
+
+  updateAlertStatus: (alertId: string, status: AlertStatus): Promise<Alert> => {
+    return apiFetch<Alert>(`/alerts/${alertId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  },
 };
+
+

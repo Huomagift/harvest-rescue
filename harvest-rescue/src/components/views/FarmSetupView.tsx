@@ -1,73 +1,55 @@
+"use client";
+
 import React, { useState } from "react";
-import { Sprout, MapPin, Calendar, User, ArrowRight, AlertCircle, Sparkles } from "lucide-react";
+import { Sprout, MapPin, Calendar, User, ArrowRight, AlertCircle, Navigation, FileText } from "lucide-react";
 import { Button } from "../ui/Button";
+import { SkeletonCard } from "../ui/SkeletonCard";
 import { api } from "@/lib/api";
 import { Farm } from "@/lib/types";
 
 export interface FarmSetupViewProps {
   onFarmCreated: (farm: Farm) => void;
   onCancel: () => void;
-  initialPreset?: { name: string; latitude: number; longitude: number; crop_type: string } | null;
 }
-
-const PRESET_LOCATIONS = [
-  {
-    name: "Lokoja Confluence Farm",
-    owner_name: "Demo Farmer A",
-    latitude: 7.8023,
-    longitude: 6.7333,
-    crop_type: "maize",
-    planting_date: "2026-06-15",
-    tag: "Flood Risk Demo",
-  },
-  {
-    name: "Kaduna Maize Belt Farm",
-    owner_name: "Demo Farmer C",
-    latitude: 10.5105,
-    longitude: 7.4165,
-    crop_type: "maize",
-    planting_date: "2026-05-20",
-    tag: "Vigor Decline Demo",
-  },
-  {
-    name: "Makurdi Riverside Farm",
-    owner_name: "Demo Farmer B",
-    latitude: 7.7322,
-    longitude: 8.5391,
-    crop_type: "rice",
-    planting_date: "2026-06-01",
-    tag: "Benue Basin Control",
-  },
-];
 
 export const FarmSetupView: React.FC<FarmSetupViewProps> = ({
   onFarmCreated,
   onCancel,
-  initialPreset,
 }) => {
-  const [name, setName] = useState(initialPreset?.name || "My Farm Field 1");
-  const [ownerName, setOwnerName] = useState("Demo Farmer");
-  const [latitude, setLatitude] = useState<string>(
-    initialPreset?.latitude ? String(initialPreset.latitude) : "7.8023"
-  );
-  const [longitude, setLongitude] = useState<string>(
-    initialPreset?.longitude ? String(initialPreset.longitude) : "6.7333"
-  );
-  const [cropType, setCropType] = useState(initialPreset?.crop_type || "maize");
-  const [plantingDate, setPlantingDate] = useState("2026-06-01");
+  const [name, setName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [elevation, setElevation] = useState("");
+  const [cropType, setCropType] = useState("maize");
+  const [plantingDate, setPlantingDate] = useState("");
+  const [notes, setNotes] = useState("");
 
+  const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusStep, setStatusStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const applyPreset = (preset: typeof PRESET_LOCATIONS[0]) => {
-    setName(preset.name);
-    setOwnerName(preset.owner_name);
-    setLatitude(String(preset.latitude));
-    setLongitude(String(preset.longitude));
-    setCropType(preset.crop_type);
-    setPlantingDate(preset.planting_date);
+  // Auto-detect GPS location helper
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsLocating(true);
     setError(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude.toFixed(5));
+        setLongitude(position.coords.longitude.toFixed(5));
+        setIsLocating(false);
+      },
+      (err) => {
+        setError(`Unable to detect location: ${err.message}. Please enter coordinates manually.`);
+        setIsLocating(false);
+      },
+      { timeout: 10000 }
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,7 +59,7 @@ export const FarmSetupView: React.FC<FarmSetupViewProps> = ({
     const lngNum = parseFloat(longitude);
 
     if (!name.trim()) {
-      setError("Please enter a farm name.");
+      setError("Please enter your farm name.");
       return;
     }
 
@@ -95,25 +77,34 @@ export const FarmSetupView: React.FC<FarmSetupViewProps> = ({
     setError(null);
 
     try {
-      // Step 1: POST /farms/
+      const elevNum = elevation.trim() ? parseFloat(elevation) : undefined;
+
       setStatusStep("Registering farm details with backend...");
       const createdFarm = await api.createFarm({
         name: name.trim(),
         owner_name: ownerName.trim() || undefined,
         latitude: latNum,
         longitude: lngNum,
+        elevation: !isNaN(elevNum as number) ? elevNum : undefined,
         crop_type: cropType.trim(),
         planting_date: plantingDate || undefined,
       });
 
-      // Step 2: POST /risk/{id}/evaluate
-      setStatusStep("Ingesting satellite imagery & weather risk data...");
+      // Submit optional note if provided
+      if (notes.trim()) {
+        await api.submitFarmerReport(createdFarm.id, {
+          note: notes.trim(),
+          category: "onboarding_profile",
+        }).catch(() => null);
+      }
+
+      setStatusStep("Connecting Sentinel-2 satellite feed & Open-Meteo 16-day forecast...");
       await api.evaluateRisk(createdFarm.id);
 
-      setStatusStep("Analysis complete!");
+      setStatusStep("Calibration complete!");
       setTimeout(() => {
         onFarmCreated(createdFarm);
-      }, 500);
+      }, 400);
     } catch (err: any) {
       setError(err.message || "Failed to setup farm. Please check backend connection.");
       setIsSubmitting(false);
@@ -124,179 +115,207 @@ export const FarmSetupView: React.FC<FarmSetupViewProps> = ({
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10 space-y-6">
       {/* Header */}
-      <div className="space-y-2 text-center sm:text-left">
-        <span className="m3-label-medium text-[#1B4D3E] font-bold uppercase tracking-wider">
-          Step 1 of 2
+      <div className="space-y-2">
+        <span className="m3-label-medium text-[#1B4D3E] uppercase font-bold tracking-wider">
+          Farmer Account &amp; Field Onboarding
         </span>
-        <h2 className="m3-headline-medium text-[#191C1A]">Register Farm & Run First Risk Scan</h2>
+        <h2 className="m3-headline-medium text-[#191C1A] font-extrabold">Create Account &amp; Register Farm</h2>
         <p className="m3-body-medium text-[#414943]">
-          Provide your field coordinates and crop details to calibrate real-time satellite imagery and weather signals.
+          Create your account and enter your farm coordinates to start 24/7 predictive monitoring with Google Earth Engine satellite imagery and 16-day Open-Meteo forecasts.
         </p>
       </div>
 
-      {/* Preset Quick-Fill selector */}
-      <div className="p-4 rounded-2xl bg-[#D8ECE0]/50 border border-[#A3D9B5] space-y-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-[#1B4D3E]" />
-          <span className="m3-label-large text-[#052119]">Quick-Fill Benchmark Locations</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {PRESET_LOCATIONS.map((preset, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => applyPreset(preset)}
-              className="p-2.5 rounded-xl bg-white border border-[#C1C9C3] text-left hover:border-[#1B4D3E] hover:bg-[#F0F4EF] transition-all cursor-pointer"
-            >
-              <p className="m3-label-large text-[#191C1A] truncate">{preset.name.split(" ")[0]}</p>
-              <p className="m3-label-medium text-[#1B4D3E] font-semibold">{preset.tag}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="p-6 rounded-3xl bg-[#F0F4EF] border border-[#E0E4DF] space-y-5 shadow-sm">
-        {error && (
-          <div className="p-4 rounded-2xl bg-[#FFDAD6] border border-[#FFB4AB] text-[#410E0B] text-sm flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>{error}</span>
+      {/* Submission Loading State (Skeleton card pattern) */}
+      {isSubmitting ? (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-[#D8ECE0] text-[#052119] text-sm font-semibold flex items-center gap-2 animate-pulse">
+            <Sprout className="w-5 h-5 text-[#1B4D3E] animate-spin" />
+            <span>{statusStep || "Processing registration..."}</span>
           </div>
-        )}
-
-        {/* Farm Name */}
-        <div>
-          <label className="m3-label-medium text-[#191C1A] block mb-1 font-semibold">
-            Farm Name *
-          </label>
-          <div className="relative">
-            <Sprout className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Lokoja Confluence Farm"
-              className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
-            />
-          </div>
+          <SkeletonCard count={2} />
         </div>
+      ) : (
+        /* Un-Prefilled Form */
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 rounded-3xl bg-[#F0F4EF] border border-[#E0E4DF] space-y-5 shadow-sm">
+          {error && (
+            <div className="p-4 rounded-2xl bg-[#FFDAD6] border border-[#FFB4AB] text-[#410E0B] text-sm flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        {/* Owner Name */}
-        <div>
-          <label className="m3-label-medium text-[#191C1A] block mb-1 font-semibold">
-            Farmer / Owner Name
-          </label>
-          <div className="relative">
-            <User className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
-            <input
-              type="text"
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              placeholder="e.g. John Doe"
-              className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
-            />
-          </div>
-        </div>
-
-        {/* Coordinates */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Account / Farmer Name */}
           <div>
             <label className="m3-label-medium text-[#191C1A] block mb-1 font-semibold">
-              Latitude (-90 to 90) *
+              Farmer / Account Name *
             </label>
             <div className="relative">
-              <MapPin className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
+              <User className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
               <input
-                type="number"
-                step="any"
+                type="text"
                 required
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="7.8023"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="e.g. Ibrahim Abubakar"
                 className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
               />
             </div>
           </div>
 
+          {/* Farm Name */}
           <div>
             <label className="m3-label-medium text-[#191C1A] block mb-1 font-semibold">
-              Longitude (-180 to 180) *
+              Farm Field Name *
             </label>
             <div className="relative">
-              <MapPin className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
+              <Sprout className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
               <input
-                type="number"
-                step="any"
+                type="text"
                 required
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="6.7333"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Green Valley Maize Farm"
                 className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
               />
             </div>
           </div>
-        </div>
 
-        {/* Crop Type & Planting Date */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="m3-label-medium text-[#191C1A] block mb-1 font-semibold">
-              Crop Type *
-            </label>
-            <select
-              value={cropType}
-              onChange={(e) => setCropType(e.target.value)}
-              className="w-full h-12 px-4 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
-            >
-              <option value="maize">Maize (Corn)</option>
-              <option value="rice">Rice</option>
-              <option value="cassava">Cassava</option>
-              <option value="sorghum">Sorghum</option>
-              <option value="wheat">Wheat</option>
-              <option value="yam">Yam</option>
-            </select>
+          {/* Location & GPS Helper */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="m3-label-medium text-[#191C1A] font-semibold">
+                Field Coordinates *
+              </label>
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={isLocating}
+                className="inline-flex items-center gap-1.5 text-xs text-[#1B4D3E] font-bold hover:underline cursor-pointer"
+              >
+                <Navigation className={`w-3.5 h-3.5 ${isLocating ? "animate-spin" : ""}`} />
+                <span>{isLocating ? "Detecting GPS..." : "Use Current GPS Location"}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <div className="relative">
+                  <MapPin className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                    placeholder="Lat (e.g. 10.4866)"
+                    className="w-full h-12 pl-11 pr-3 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="relative">
+                  <MapPin className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                    placeholder="Long (e.g. 7.4435)"
+                    className="w-full h-12 pl-11 pr-3 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="relative">
+                  <MapPin className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
+                  <input
+                    type="number"
+                    step="any"
+                    value={elevation}
+                    onChange={(e) => setElevation(e.target.value)}
+                    placeholder="Elevation m (e.g. 578)"
+                    className="w-full h-12 pl-11 pr-3 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
+          {/* Crop Type & Planting Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="m3-label-medium text-[#191C1A] block mb-1 font-semibold">
+                Crop Type *
+              </label>
+              <select
+                value={cropType}
+                onChange={(e) => setCropType(e.target.value)}
+                className="w-full h-12 px-4 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
+              >
+                <option value="maize">Maize (Corn)</option>
+                <option value="rice">Rice</option>
+                <option value="cassava">Cassava</option>
+                <option value="sorghum">Sorghum</option>
+                <option value="wheat">Wheat</option>
+                <option value="yam">Yam</option>
+                <option value="soybeans">Soybeans</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="m3-label-medium text-[#191C1A] block mb-1 font-semibold">
+                Planting Date
+              </label>
+              <div className="relative">
+                <Calendar className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
+                <input
+                  type="date"
+                  value={plantingDate}
+                  onChange={(e) => setPlantingDate(e.target.value)}
+                  className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Optional Additional Farm Info */}
           <div>
             <label className="m3-label-medium text-[#191C1A] block mb-1 font-semibold">
-              Planting Date
+              Field Notes / Soil &amp; Irrigation Setup (Optional)
             </label>
             <div className="relative">
-              <Calendar className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
+              <FileText className="w-5 h-5 absolute left-3.5 top-3.5 text-[#717973]" />
               <input
-                type="date"
-                value={plantingDate}
-                onChange={(e) => setPlantingDate(e.target.value)}
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g. Clay-loam soil, rainfed field near riverbank"
                 className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white border border-[#C1C9C3] text-[#191C1A] m3-body-medium focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
               />
             </div>
           </div>
-        </div>
 
-        {/* Progress status step */}
-        {statusStep && (
-          <div className="p-3 rounded-xl bg-[#D8ECE0] text-[#052119] text-xs font-semibold flex items-center gap-2 animate-pulse">
-            <Sparkles className="w-4 h-4 text-[#1B4D3E]" />
-            <span>{statusStep}</span>
+          {/* Action Buttons */}
+          <div className="pt-3 flex items-center justify-end gap-3">
+            <Button type="button" variant="text" onClick={onCancel} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="filled"
+              isLoading={isSubmitting}
+              rightIcon={<ArrowRight className="w-4 h-4" />}
+            >
+              Register &amp; Start Monitoring
+            </Button>
           </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="pt-3 flex items-center justify-end gap-3">
-          <Button type="button" variant="text" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="filled"
-            isLoading={isSubmitting}
-            rightIcon={<ArrowRight className="w-4 h-4" />}
-          >
-            Run Initial Risk Evaluation
-          </Button>
-        </div>
-      </form>
+        </form>
+      )}
     </div>
   );
 };
+
+export default FarmSetupView;

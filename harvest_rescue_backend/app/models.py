@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, date
 
-from sqlalchemy import Column, String, Float, Date, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, String, Float, Date, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -19,11 +19,15 @@ class Farm(Base):
     owner_name = Column(String, nullable=True)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
+    elevation = Column(Float, nullable=True)
     crop_type = Column(String, nullable=False)
     planting_date = Column(Date, nullable=True)
+    is_demo = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    last_monitored_at = Column(DateTime, nullable=True)
 
-    risk_events = relationship("RiskEvent", back_populates="farm")
+    risk_events = relationship("RiskEvent", back_populates="farm", cascade="all, delete-orphan")
+    alerts = relationship("Alert", back_populates="farm", cascade="all, delete-orphan")
 
 
 class RiskEvent(Base):
@@ -40,6 +44,24 @@ class RiskEvent(Base):
     farm = relationship("Farm", back_populates="risk_events")
 
 
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    farm_id = Column(String, ForeignKey("farms.id"), nullable=False)
+    risk_event_id = Column(String, ForeignKey("risk_events.id"), nullable=True)
+    risk_type = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    severity = Column(String, nullable=False)         # low | medium | high
+    status = Column(String, nullable=False, default="unread") # unread | read | dismissed
+    days_to_impact = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    farm = relationship("Farm", back_populates="alerts")
+    risk_event = relationship("RiskEvent")
+
+
 class FarmerReport(Base):
     __tablename__ = "farmer_reports"
 
@@ -48,3 +70,4 @@ class FarmerReport(Base):
     note = Column(String, nullable=False)
     category = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
