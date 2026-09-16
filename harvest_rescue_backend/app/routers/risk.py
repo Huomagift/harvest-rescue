@@ -51,3 +51,25 @@ def get_latest_risk(farm_id: str, db: Session = Depends(get_db)):
         .all()
     )
     return events
+
+@router.get("/{farm_id}/signals")
+def get_raw_signals(farm_id: str, db: Session = Depends(get_db)):
+    """
+    Returns the raw weather and NDVI signals for a farm, including each one's
+    `source` field ("live_open_meteo" / "live_gee" vs "fallback_mock"). Use
+    this to directly verify real external data is being used, independent of
+    whether any risk threshold actually triggers an event.
+    """
+    farm = db.query(models.Farm).filter(models.Farm.id == farm_id).first()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+
+    weather = get_weather_signal(farm.latitude, farm.longitude)
+    ndvi = get_ndvi_signal(farm.latitude, farm.longitude, farm_name=farm.name)
+
+    return {
+        "farm_id": farm_id,
+        "farm_name": farm.name,
+        "weather": weather,
+        "ndvi": ndvi,
+    }

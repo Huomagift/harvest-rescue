@@ -1,69 +1,143 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Farm } from "@/lib/types";
+import { api } from "@/lib/api";
+import { TopAppBar } from "@/components/ui/TopAppBar";
+import { WelcomeView } from "@/components/views/WelcomeView";
+import { FarmSetupView } from "@/components/views/FarmSetupView";
+import { FarmDashboardView } from "@/components/views/FarmDashboardView";
+import { Loader2 } from "lucide-react";
 
 export default function Home() {
+  const [farms, setFarms] = useState<Farm[]>([]);
+  const [currentFarm, setCurrentFarm] = useState<Farm | null>(null);
+  const [activeTab, setActiveTab] = useState<"welcome" | "setup" | "dashboard">("dashboard");
+  const [isLoadingFarms, setIsLoadingFarms] = useState<boolean>(true);
+  const [presetConfig, setPresetConfig] = useState<{
+    name: string;
+    latitude: number;
+    longitude: number;
+    crop_type: string;
+  } | null>(null);
+
+  const loadFarms = async (autoSelectId?: string) => {
+    setIsLoadingFarms(true);
+    try {
+      const fetchedFarms = await api.listFarms();
+      setFarms(fetchedFarms);
+
+      if (fetchedFarms.length > 0) {
+        if (autoSelectId) {
+          const match = fetchedFarms.find((f) => f.id === autoSelectId);
+          if (match) setCurrentFarm(match);
+          else setCurrentFarm(fetchedFarms[0]);
+        } else if (!currentFarm) {
+          setCurrentFarm(fetchedFarms[0]);
+        }
+        if (activeTab === "welcome" && !presetConfig) {
+          setActiveTab("dashboard");
+        }
+      } else {
+        setActiveTab("welcome");
+      }
+    } catch (err) {
+      console.warn("Could not fetch farms from backend API:", err);
+      setActiveTab("welcome");
+    } finally {
+      setIsLoadingFarms(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFarms();
+  }, []);
+
+  const handleSelectPreset = (name: string, lat: number, lng: number, crop: string) => {
+    setPresetConfig({
+      name,
+      latitude: lat,
+      longitude: lng,
+      crop_type: crop,
+    });
+    setActiveTab("setup");
+  };
+
+  const handleFarmCreated = (newFarm: Farm) => {
+    setFarms((prev) => [newFarm, ...prev]);
+    setCurrentFarm(newFarm);
+    setPresetConfig(null);
+    setActiveTab("dashboard");
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div className="min-h-screen flex flex-col bg-[#FBFDFA] text-[#191C1A]">
+      <TopAppBar
+        farms={farms}
+        currentFarm={currentFarm}
+        onSelectFarm={(farm) => {
+          setCurrentFarm(farm);
+          setActiveTab("dashboard");
+        }}
+        onNavigateToSetup={() => {
+          setPresetConfig(null);
+          setActiveTab("setup");
+        }}
+        onNavigateToHome={() => setActiveTab("welcome")}
+        activeTab={activeTab}
+      />
+
+      <main className="flex-1 pb-16">
+        {isLoadingFarms && farms.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-[#1B4D3E]">
+            <Loader2 className="w-8 h-8 animate-spin" />
+            <span className="m3-label-large">Connecting to Harvest Rescue AI...</span>
+          </div>
+        ) : (
+          <>
+            {activeTab === "welcome" && (
+              <WelcomeView
+                onStartSetup={() => {
+                  setPresetConfig(null);
+                  setActiveTab("setup");
+                }}
+                onSelectPresetFarm={handleSelectPreset}
+              />
+            )}
+
+            {activeTab === "setup" && (
+              <FarmSetupView
+                onFarmCreated={handleFarmCreated}
+                onCancel={() => {
+                  if (currentFarm) setActiveTab("dashboard");
+                  else setActiveTab("welcome");
+                }}
+                initialPreset={presetConfig}
+              />
+            )}
+
+            {activeTab === "dashboard" && currentFarm && (
+              <FarmDashboardView
+                farm={currentFarm}
+                onNavigateToSetup={() => {
+                  setPresetConfig(null);
+                  setActiveTab("setup");
+                }}
+              />
+            )}
+          </>
+        )}
       </main>
+
+      {/* Material 3 Bottom Footer */}
+      <footer className="border-t border-[#E0E4DF] bg-[#F0F4EF] py-6 px-4">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#717973]">
+          <p>© 2026 Harvest Rescue AI — Agronomic Early Warning System</p>
+          <div className="flex items-center gap-4">
+            <span>Sentinel-2 Satellite Feed</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

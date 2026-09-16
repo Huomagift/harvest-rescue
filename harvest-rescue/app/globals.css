@@ -1,26 +1,113 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --m3-primary: #1B4D3E;
+    --m3-on-primary: #FFFFFF;
+    --m3-primary-container: #D8ECE0;
+    --m3-on-primary-container: #052119;
+
+    --m3-secondary: #2D6A4F;
+    --m3-on-secondary: #FFFFFF;
+    --m3-secondary-container: #E2F2E6;
+    --m3-on-secondary-container: #0C2012;
+
+    --m3-tertiary: #8B5000;
+    --m3-on-tertiary: #FFFFFF;
+    --m3-tertiary-container: #FFDCC2;
+    --m3-on-tertiary-container: #341200;
+
+    --m3-error: #BA1A1A;
+    --m3-on-error: #FFFFFF;
+    --m3-error-container: #FFDAD6;
+    --m3-on-error-container: #410E0B;
+
+    --m3-surface: #FBFDFA;
+    --m3-on-surface: #191C1A;
+    --m3-surface-variant: #E0E4DF;
+    --m3-on-surface-variant: #414943;
+    --m3-surface-container: #F0F4EF;
+    --m3-surface-container-high: #E8EDE6;
+
+    --m3-outline: #717973;
+    --m3-outline-variant: #C1C9C3;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--m3-surface);
+  color: var(--m3-on-surface);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Material Design 3 Typography Scale Tokens */
+.m3-display-large {
+  font-size: 3.5rem;
+  line-height: 4rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.m3-display-medium {
+  font-size: 2.75rem;
+  line-height: 3.25rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.m3-headline-large {
+  font-size: 2rem;
+  line-height: 2.5rem;
+  font-weight: 600;
+}
+
+.m3-headline-medium {
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+  font-weight: 600;
+}
+
+.m3-title-large {
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+}
+
+.m3-title-medium {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+}
+
+.m3-body-large {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 400;
+}
+
+.m3-body-medium {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+.m3-label-large {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.m3-label-medium {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Ensure minimum 48px touch target height for mobile ergonomics */
+.m3-touch-target {
+  min-height: 48px;
+  min-width: 48px;
 }
