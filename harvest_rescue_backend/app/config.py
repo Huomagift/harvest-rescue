@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # Auth: a shared secret your frontend sends on every request via the
     # X-API-Key header. Rotate it any time by changing the .env value —
     # no code changes needed.
-    backend_api_key: str
+    backend_api_key: str 
 
     # Comma-separated list in .env, parsed into a list here.
     allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # Google Cloud project tied to your Earth Engine account.
     gee_project_id: str | None = None
 
-    database_url: str = "sqlite:///./harvest_rescue.db"
+    database_url: str = "postgresql://postgres.wfthbfougrgbhzsbgzmp:SjH77*9YqpsWU.*@aws-1-eu-west-1.pooler.supabase.com:5432/postgres"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
