@@ -2,9 +2,13 @@
 Google Earth Engine NDVI integration.
 
 Setup required before this works live:
-1. `earthengine authenticate` once locally (opens a browser to log in with
-   your approved GEE account).
-2. GEE_PROJECT_ID must be set in .env — ee.Initialize() uses it on startup.
+1. Locally: `earthengine authenticate` once (opens a browser to log in with
+   your approved GEE account) — used only for local dev.
+2. In production (Render): a service account is used instead. Set these
+   environment variables:
+   - GEE_SERVICE_ACCOUNT_EMAIL: the service account's email
+   - GEE_SERVICE_ACCOUNT_KEY: the service account's JSON key, base64-encoded
+   - GEE_PROJECT_ID (optional): your GCP project ID
 
 Fallback behavior: if the live GEE call fails (auth not finished, no
 imagery for the date range, network issue), returns a clearly-labeled
@@ -12,7 +16,9 @@ fallback value instead of crashing the demo. Drop real NDVI values pulled
 manually from the GEE code editor into FALLBACK_NDVI_BY_FARM_NAME so the
 demo still runs on real numbers even if the live call isn't working yet.
 """
+import base64
 import datetime
+import os
 
 import ee
 
@@ -28,9 +34,22 @@ _DEFAULT_FALLBACK_NDVI = 0.5
 
 def init_earth_engine(project_id: str | None = None) -> None:
     global _EE_INITIALIZED
-    if not _EE_INITIALIZED:
+    if _EE_INITIALIZED:
+        return
+
+    service_account_email = os.environ.get("GEE_SERVICE_ACCOUNT_EMAIL")
+    encoded_key = os.environ.get("GEE_SERVICE_ACCOUNT_KEY")
+
+    if service_account_email and encoded_key:
+        # Production path (Render): authenticate as a service account.
+        key_json_str = base64.b64decode(encoded_key).decode("utf-8")
+        credentials = ee.ServiceAccountCredentials(service_account_email, key_data=key_json_str)
+        ee.Initialize(credentials, project=project_id) if project_id else ee.Initialize(credentials)
+    else:
+        # Local dev path: relies on `earthengine authenticate` having been run.
         ee.Initialize(project=project_id) if project_id else ee.Initialize()
-        _EE_INITIALIZED = True
+
+    _EE_INITIALIZED = True
 
 
 def get_ndvi_signal(latitude: float, longitude: float, farm_name: str = "") -> dict:
@@ -44,9 +63,6 @@ def get_ndvi_signal(latitude: float, longitude: float, farm_name: str = "") -> d
     }
 
     def live_call() -> dict:
-        # NOTE: ee.Date.now() is JS Earth Engine API syntax and does not exist
-        # in the Python client. Build "today" from Python's own datetime instead,
-        # then wrap it as an ee.Date.
         today = ee.Date(datetime.datetime.utcnow())
 
         point = ee.Geometry.Point([longitude, latitude])
