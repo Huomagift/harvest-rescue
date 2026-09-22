@@ -30,6 +30,8 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans bg-[#FBFDFA] text-[#191C1A]">
         {children}
+        
+      <script src="https://widget.swiftagents.org/dist/widget-ui.js" data-company-id="cea89680-7ec8-45e7-bc2d-9e6a319d6740" data-api-key="swa_live_fa87fa96ced619214ccda33b66807dac15f4073df57c89d18538186094b9fc88" defer></script>
       </body>
     </html>
   );
