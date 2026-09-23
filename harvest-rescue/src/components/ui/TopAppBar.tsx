@@ -1,23 +1,28 @@
 import React from "react";
-import { Sprout, Plus, ChevronDown, Bell, Home, Layers, Trash2 } from "lucide-react";
+import { Sprout, Plus, ChevronDown, Bell, Home, Layers, Trash2, User, LogIn } from "lucide-react";
 import { Farm } from "@/lib/types";
 import { Button } from "./Button";
+import { UserProfile } from "@/lib/api";
 
 export interface TopAppBarProps {
   farms: Farm[];
   currentFarm: Farm | null;
+  currentUser: UserProfile | null;
+  onOpenAuth: () => void;
   onSelectFarm: (farm: Farm) => void;
   onNavigateToSetup: () => void;
   onNavigateToHome: () => void;
   onDeleteFarm?: (farmId: string) => void;
   onOpenAlerts?: () => void;
   unreadAlertsCount?: number;
-  activeTab: "welcome" | "setup" | "dashboard";
+  activeTab: "welcome" | "setup" | "overview" | "dashboard";
 }
 
 export const TopAppBar: React.FC<TopAppBarProps> = ({
   farms,
   currentFarm,
+  currentUser,
+  onOpenAuth,
   onSelectFarm,
   onNavigateToSetup,
   onNavigateToHome,
@@ -70,39 +75,68 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
             </button>
           )}
 
-          {/* Farm Switcher Dropdown (when farms exist) */}
-          {farms.length > 0 && (
-            <div className="relative">
-              <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="m3-touch-target flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#D8ECE0] text-[#052119] hover:bg-[#c2e4cf] transition-colors border border-[#A3D9B5] cursor-pointer"
-                aria-label="Select Farm"
-              >
-                <Layers className="w-4 h-4 text-[#1B4D3E]" />
-                <span className="m3-label-large max-w-[120px] sm:max-w-[180px] truncate">
-                  {currentFarm ? currentFarm.name : "Select Farm"}
-                </span>
-                <ChevronDown className="w-4 h-4 text-[#1B4D3E]" />
-              </button>
+          {/* Farm Switcher Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="m3-touch-target flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#D8ECE0] text-[#052119] hover:bg-[#c2e4cf] transition-colors border border-[#A3D9B5] cursor-pointer"
+              aria-label="Select Farm"
+            >
+              <Layers className="w-4 h-4 text-[#1B4D3E]" />
+              <span className="m3-label-large max-w-[120px] sm:max-w-[170px] truncate">
+                {activeTab === "overview" && currentUser
+                  ? "All Parcels"
+                  : currentFarm
+                  ? currentFarm.name
+                  : currentUser
+                  ? "My Farm Parcels"
+                  : "Demo Farms"}
+              </span>
+              <ChevronDown className="w-4 h-4 text-[#1B4D3E]" />
+            </button>
 
-              {isDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setIsDropdownOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-[#E0E4DF] shadow-xl py-2 z-20 overflow-hidden">
-                    <div className="px-3 py-2 border-b border-[#E0E4DF] bg-[#F0F4EF] flex items-center justify-between">
-                      <p className="m3-label-medium text-[#717973] uppercase tracking-wider font-bold">
-                        Farms ({farms.length})
-                      </p>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto divide-y divide-[#E0E4DF]/60">
-                      {farms.map((farm) => (
+            {isDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setIsDropdownOpen(false)}
+                />
+                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-[#E0E4DF] shadow-xl py-2 z-20 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-[#E0E4DF] bg-[#F0F4EF] flex items-center justify-between">
+                    <p className="text-[11px] text-[#1B4D3E] uppercase tracking-wider font-extrabold">
+                      {currentUser ? `My Farms (${farms.length})` : `Demo Scenarios (${farms.length})`}
+                    </p>
+                    {currentUser && (
+                      <span className="text-[10px] font-bold text-[#717973] truncate max-w-[110px]">
+                        {currentUser.email}
+                      </span>
+                    )}
+                  </div>
+
+                  {currentUser && (
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        onNavigateToHome();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[#1B4D3E] hover:bg-[#D8ECE0]/50 border-b border-[#E0E4DF]/60 text-left transition-colors"
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>View All Parcels (Overview)</span>
+                    </button>
+                  )}
+
+                  <div className="max-h-64 overflow-y-auto divide-y divide-[#E0E4DF]/60">
+                    {farms.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-[#717973]">
+                        No farms registered yet. Click &quot;Add Farm&quot; to register your first plot!
+                      </div>
+                    ) : (
+                      farms.map((farm) => (
                         <div
                           key={farm.id}
                           className={`flex items-center justify-between px-3 py-2.5 hover:bg-[#F0F4EF] transition-colors ${
-                            currentFarm?.id === farm.id
+                            currentFarm?.id === farm.id && activeTab === "dashboard"
                               ? "bg-[#D8ECE0]/50 font-semibold border-l-4 border-[#1B4D3E]"
                               : ""
                           }`}
@@ -125,17 +159,17 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                               )}
                             </div>
                             <span className="m3-label-medium text-[#717973] capitalize block text-xs truncate">
-                              {farm.crop_type} • ({farm.latitude.toFixed(2)}, {farm.longitude.toFixed(2)})
-                              {farm.elevation ? ` • ${Math.round(farm.elevation)}m` : ""}
+                              {farm.location_name ? `${farm.location_name} · ${farm.crop_type}` : `${farm.crop_type} • (${farm.latitude.toFixed(2)}, ${farm.longitude.toFixed(2)})`}
+                              {farm.size_hectares ? ` • ${farm.size_hectares} ha` : ""}
                             </span>
                           </button>
 
-                          {/* Delete Action (Disabled/hidden for Demo Benchmark Farms) */}
+                          {/* Delete Action (Disabled for Demo Farms) */}
                           {!farm.is_demo && onDeleteFarm && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm(`Are you sure you want to delete ${farm.name}?`)) {
+                                if (confirm(`Are you sure you want to remove ${farm.name}?`)) {
                                   onDeleteFarm(farm.id);
                                 }
                               }}
@@ -146,43 +180,62 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                             </button>
                           )}
                         </div>
-                      ))}
-                    </div>
-                    <div className="p-2 border-t border-[#E0E4DF] bg-[#FBFDFA]">
-                      <button
-                        onClick={() => {
-                          setIsDropdownOpen(false);
-                          onNavigateToSetup();
-                        }}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#1B4D3E] text-white text-xs font-semibold hover:bg-[#163E32]"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add New Farm
-                      </button>
-                    </div>
+                      ))
+                    )}
                   </div>
-                </>
-              )}
-            </div>
+
+                  <div className="p-2 border-t border-[#E0E4DF] bg-[#FBFDFA]">
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        onNavigateToSetup();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#1B4D3E] text-white text-xs font-semibold hover:bg-[#163E32]"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add New Farm
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* User Account / Profile Button */}
+          {currentUser ? (
+            <button
+              onClick={onOpenAuth}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F0F4EF] hover:bg-[#E0E4DF] border border-[#E0E4DF] text-xs font-bold text-[#191C1A] transition-colors cursor-pointer"
+              title={`Logged in as ${currentUser.name} (${currentUser.email})`}
+            >
+              <div className="w-5 h-5 rounded-full bg-[#1B4D3E] text-white flex items-center justify-center text-[10px]">
+                {currentUser.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="hidden sm:inline max-w-[100px] truncate">{currentUser.name}</span>
+            </button>
+          ) : (
+            <Button
+              variant="outlined"
+              size="sm"
+              onClick={onOpenAuth}
+              leftIcon={<LogIn className="w-3.5 h-3.5" />}
+              className="text-xs font-bold"
+            >
+              Sign In
+            </Button>
           )}
 
-          {/* Setup CTA button */}
-          <Button
-            variant={activeTab === "setup" ? "filled" : "tonal"}
-            size="sm"
-            onClick={onNavigateToSetup}
-            leftIcon={<Plus className="w-4 h-4" />}
-            className="hidden xs:inline-flex"
-          >
-            Add Farm
-          </Button>
-
-          {/* Navigation to Home/Welcome */}
+          {/* Navigation to Home/Welcome/Overview */}
           {activeTab !== "welcome" && (
             <button
               onClick={onNavigateToHome}
-              className="p-2 rounded-full text-[#414943] hover:bg-[#E0E4DF] transition-colors"
-              title="Welcome & Onboarding"
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
+                currentUser && activeTab === "overview"
+                  ? "text-[#1B4D3E] bg-[#D8ECE0]"
+                  : "text-[#414943] hover:bg-[#E0E4DF]"
+              }`}
+              title={currentUser ? "Farmer Portfolio Dashboard" : "Welcome & Onboarding"}
+              aria-label={currentUser ? "Farmer Portfolio Dashboard" : "Welcome & Onboarding"}
             >
               <Home className="w-5 h-5" />
             </button>

@@ -14,7 +14,8 @@ from app import models
 from app.database import SessionLocal
 from app.services.weather import get_weather_signal
 from app.services.satellite import get_ndvi_signal
-from app.services.risk_engine import evaluate_risk
+from app.services.risk_engine import evaluate_risk, generate_farm_signals_and_intelligence
+from app.services.email_notifications import send_compounded_risk_notification
 
 logger = logging.getLogger("harvest_rescue")
 
@@ -103,15 +104,30 @@ def run_monitoring_sweep(db: Session = None) -> dict:
                 events = evaluate_risk(weather, ndvi)
                 farm.last_monitored_at = datetime.utcnow()
 
+                farm_saved_events = []
                 for event_data in events:
                     risks_found += 1
                     risk_event = models.RiskEvent(farm_id=farm.id, **event_data)
                     db.add(risk_event)
                     db.flush()  # populate risk_event.id
+                    farm_saved_events.append(risk_event)
 
                     # Create or update persistent alert for medium and high risk events (or any triggered event)
                     create_or_update_alert(db, farm, risk_event)
                     alerts_affected += 1
+
+                if farm.farmer_email and farm_saved_events:
+                    try:
+                        intel = generate_farm_signals_and_intelligence(farm, weather, ndvi, events)
+                        send_compounded_risk_notification(
+                            db=db,
+                            farm=farm,
+                            events=farm_saved_events,
+                            why_factors=intel.get("why_factors"),
+                            recommended_action=intel.get("recommended_action"),
+                        )
+                    except Exception as email_err:
+                        logger.error(f"[Monitoring Sweep] Email notification error for farm {farm.name}: {email_err}")
 
             except Exception as farm_err:
                 logger.error(f"[Monitoring Sweep] Error scanning farm {farm.id} ({farm.name}): {farm_err}")

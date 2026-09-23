@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.database import init_db
-from app.routers import farms, risk, alerts
+from app.routers import farms, risk, alerts, auth
 from app.services.satellite import init_earth_engine
 from app.services.scheduler import start_scheduler, shutdown_scheduler
 
@@ -22,6 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(farms.router)
 app.include_router(risk.router)
 app.include_router(alerts.router)

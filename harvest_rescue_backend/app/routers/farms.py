@@ -1,25 +1,84 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.security import require_api_key
 from app import models, schemas
+from app.routers.auth import get_current_user_from_header
 
 router = APIRouter(prefix="/farms", tags=["farms"], dependencies=[Depends(require_api_key)])
 
 
+@router.post("", response_model=schemas.FarmOut)
 @router.post("/", response_model=schemas.FarmOut)
-def create_farm(farm: schemas.FarmCreate, db: Session = Depends(get_db)):
-    db_farm = models.Farm(**farm.model_dump())
+def create_farm(
+    farm: schemas.FarmCreate,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    data = farm.model_dump()
+    
+    if user:
+        if not data.get("farmer_email"):
+            data["farmer_email"] = user.email
+        if not data.get("owner_name"):
+            data["owner_name"] = user.name
+    
+    if data.get("farmer_email"):
+        data["farmer_email"] = data["farmer_email"].strip().lower()
+    
+    # If no custom polygon provided, automatically build a tight ~1.2 ha plot
+    if not data.get("boundary_geojson") and data.get("latitude") and data.get("longitude"):
+        lat = data["latitude"]
+        lon = data["longitude"]
+        d = 0.0005  # ~55m radius -> ~1.2 ha pure plot
+        data["boundary_geojson"] = {
+            "type": "Polygon",
+            "coordinates": [[
+                [round(lon - d, 6), round(lat + d, 6)],
+                [round(lon + d, 6), round(lat + d, 6)],
+                [round(lon + d, 6), round(lat - d, 6)],
+                [round(lon - d, 6), round(lat - d, 6)],
+                [round(lon - d, 6), round(lat + d, 6)],
+            ]]
+        }
+    
+    data["is_demo"] = False
+    db_farm = models.Farm(**data)
     db.add(db_farm)
     db.commit()
     db.refresh(db_farm)
     return db_farm
 
 
+@router.get("", response_model=list[schemas.FarmOut])
 @router.get("/", response_model=list[schemas.FarmOut])
-def list_farms(db: Session = Depends(get_db)):
-    return db.query(models.Farm).all()
+def list_farms(
+    email: Optional[str] = Query(None, description="Filter by farmer account email"),
+    is_demo: Optional[bool] = Query(None, description="Filter demo status"),
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns farms matching account ownership:
+    - If user is authenticated or email is provided: returns ONLY the farms owned by that farmer account.
+    - If NO user or email (public visitor): returns ONLY public demo benchmark farms.
+      Private farms belonging to registered farmers are strictly protected and never leaked.
+    """
+    user = get_current_user_from_header(authorization, db)
+    target_email = email.strip().lower() if email and email.strip() else (user.email if user else None)
+
+    query = db.query(models.Farm)
+    if target_email:
+        return query.filter(models.Farm.farmer_email == target_email).all()
+    elif is_demo is False:
+        # Cannot query all private farms without an account email or session
+        return []
+    else:
+        # Visitor mode: ONLY demo benchmark farms
+        return query.filter(models.Farm.is_demo == True).all()
 
 
 @router.get("/{farm_id}", response_model=schemas.FarmOut)

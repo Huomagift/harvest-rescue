@@ -19,17 +19,12 @@ demo still runs on real numbers even if the live call isn't working yet.
 import base64
 import datetime
 import os
-
+import logging
 import ee
 
-from app.services.external_call import call_with_fallback
+logger = logging.getLogger("harvest_rescue")
 
 _EE_INITIALIZED = False
-
-FALLBACK_NDVI_BY_FARM_NAME = {
-    "Kaduna Maize Belt Farm": 0.42,
-}
-_DEFAULT_FALLBACK_NDVI = 0.5
 
 
 def init_earth_engine(project_id: str | None = None) -> None:
@@ -54,17 +49,17 @@ def init_earth_engine(project_id: str | None = None) -> None:
 
 def get_ndvi_signal(latitude: float, longitude: float, farm_name: str = "") -> dict:
     """
-    Returns latest NDVI reading and a rolling trend (delta vs ~14 days prior)
+    Returns latest NDVI reading and rolling trend (delta vs ~14 days prior)
     for the given coordinates, using Sentinel-2 surface reflectance.
+    STRICT: Zero fake fallback deltas. If GEE call cannot be performed,
+    returns status clearly stating live earth observation state without injecting
+    synthetic mock data.
     """
-    fallback = {
-        "ndvi_current": FALLBACK_NDVI_BY_FARM_NAME.get(farm_name, _DEFAULT_FALLBACK_NDVI),
-        "ndvi_trend_delta": -0.05,  # mild simulated decline; adjust per demo farm
-    }
+    try:
+        if not _EE_INITIALIZED:
+            init_earth_engine()
 
-    def live_call() -> dict:
         today = ee.Date(datetime.datetime.utcnow())
-
         point = ee.Geometry.Point([longitude, latitude])
 
         collection = (
@@ -92,9 +87,18 @@ def get_ndvi_signal(latitude: float, longitude: float, farm_name: str = "") -> d
             reducer=ee.Reducer.mean(), geometry=point, scale=10
         ).get("NDVI").getInfo()
 
-        return {
-            "ndvi_current": latest_ndvi,
-            "ndvi_trend_delta": (latest_ndvi - earlier_ndvi) if earlier_ndvi is not None else None,
-        }
+        trend_delta = round(latest_ndvi - earlier_ndvi, 4) if (latest_ndvi is not None and earlier_ndvi is not None) else None
 
-    return call_with_fallback(live_call, fallback, source_label="gee")
+        return {
+            "ndvi_current": round(latest_ndvi, 3) if latest_ndvi is not None else None,
+            "ndvi_trend_delta": trend_delta,
+            "source": "live_gee_sentinel2",
+        }
+    except Exception as e:
+        logger.warning(f"[gee] Live satellite earth observation query unavailable for ({latitude}, {longitude}): {e}")
+        return {
+            "ndvi_current": None,
+            "ndvi_trend_delta": None,
+            "source": "earth_engine_pending_auth",
+            "service_note": f"Live satellite observation requires GEE authentication or clear imagery: {str(e)}",
+        }

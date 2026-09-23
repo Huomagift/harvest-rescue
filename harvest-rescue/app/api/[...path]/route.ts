@@ -12,6 +12,11 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
   const headers = new Headers();
   headers.set("X-API-Key", BACKEND_API_KEY);
 
+  const authHeader = request.headers.get("authorization");
+  if (authHeader) {
+    headers.set("authorization", authHeader);
+  }
+
   const contentType = request.headers.get("content-type");
   if (contentType) {
     headers.set("content-type", contentType);

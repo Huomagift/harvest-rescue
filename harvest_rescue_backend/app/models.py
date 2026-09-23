@@ -22,6 +22,13 @@ class Farm(Base):
     elevation = Column(Float, nullable=True)
     crop_type = Column(String, nullable=False)
     planting_date = Column(Date, nullable=True)
+    farmer_email = Column(String, nullable=True)
+    size_hectares = Column(Float, nullable=True)
+    location_name = Column(String, nullable=True)
+    boundary_geojson = Column(JSON, nullable=True)
+    risk_zones = Column(JSON, nullable=True)
+    last_email_notification_at = Column(DateTime, nullable=True)
+    last_notified_risk_signature = Column(String, nullable=True)
     is_demo = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_monitored_at = Column(DateTime, nullable=True)
@@ -70,4 +77,16 @@ class FarmerReport(Base):
     note = Column(String, nullable=False)
     category = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    auth_token = Column(String, index=True, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 

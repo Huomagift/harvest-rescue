@@ -138,7 +138,7 @@ export const getRiskRecommendations = (events: RiskEvent[]): AgronomicRecommenda
         {
           id: `vigor_fertilizer_${event.id}`,
           title: "Nitrogen & Micronutrient Soil Sample",
-          description: `Satellite Sentinel-2 NDVI trend shows vigor drop (delta ${event.contributing_data?.ndvi_trend_delta?.toFixed(2) ?? "-0.08"}). Scout for leaf chlorosis and test soil N-P-K balance.`,
+          description: `Crop canopy trend shows vigor decline (delta ${event.contributing_data?.ndvi_trend_delta?.toFixed(2) ?? "-0.08"}). Scout for leaf chlorosis and test soil nutrient balance.`,
           urgency: "immediate",
           riskType: "vigor_decline",
           actionText: "Order Soil Test Kit",

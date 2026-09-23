@@ -2,27 +2,45 @@
 Alerts management endpoints protected by X-API-Key authentication.
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.security import require_api_key
 from app import models, schemas
+from app.routers.auth import get_current_user_from_header
 
 router = APIRouter(prefix="/alerts", tags=["alerts"], dependencies=[Depends(require_api_key)])
 
 
+@router.get("", response_model=list[schemas.AlertOut])
 @router.get("/", response_model=list[schemas.AlertOut])
 def list_alerts(
     status: Optional[str] = Query(None, description="Filter by status: unread, read, or dismissed"),
+    email: Optional[str] = Query(None, description="Filter by farmer account email"),
+    is_demo: Optional[bool] = Query(None, description="Filter demo alerts"),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """
-    Returns all alerts, newest first, optionally filtered by status ('unread' | 'read' | 'dismissed').
+    Returns alerts scoped to the caller's context:
+    - If user is authenticated or email is provided: returns ONLY alerts belonging to that farmer's private farms.
+    - If NO user or email (public visitor): returns ONLY alerts belonging to demo benchmark farms.
     """
-    query = db.query(models.Alert)
+    user = get_current_user_from_header(authorization, db)
+    target_email = email.strip().lower() if email and email.strip() else (user.email if user else None)
+
+    query = db.query(models.Alert).join(models.Farm, models.Alert.farm_id == models.Farm.id)
     if status:
         query = query.filter(models.Alert.status == status)
+
+    if target_email:
+        # Authenticated user mode: ONLY alerts belonging to this farmer's private registered farms
+        query = query.filter(models.Farm.farmer_email == target_email, models.Farm.is_demo == False)
+    elif is_demo is True or target_email is None:
+        # Visitor mode: ONLY demo benchmark alerts
+        query = query.filter(models.Farm.is_demo == True)
+
     alerts = query.order_by(models.Alert.created_at.desc()).all()
     return alerts
 

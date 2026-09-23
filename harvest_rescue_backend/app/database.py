@@ -18,18 +18,40 @@ Base = declarative_base()
 
 
 def init_db():
+    from app import models  # Ensure all models are registered
     Base.metadata.create_all(bind=engine)
     
     for col_sql in [
         "ALTER TABLE farms ADD COLUMN last_monitored_at TIMESTAMP",
         "ALTER TABLE farms ADD COLUMN is_demo BOOLEAN DEFAULT FALSE",
         "ALTER TABLE farms ADD COLUMN elevation FLOAT",
+        "ALTER TABLE farms ADD COLUMN farmer_email VARCHAR",
+        "ALTER TABLE farms ADD COLUMN size_hectares FLOAT",
+        "ALTER TABLE farms ADD COLUMN location_name VARCHAR",
+        "ALTER TABLE farms ADD COLUMN boundary_geojson JSON",
+        "ALTER TABLE farms ADD COLUMN risk_zones JSON",
+        "ALTER TABLE farms ADD COLUMN last_email_notification_at TIMESTAMP",
+        "ALTER TABLE farms ADD COLUMN last_notified_risk_signature VARCHAR",
     ]:
         try:
             with engine.begin() as conn:
                 conn.execute(text(col_sql))
         except Exception:
             pass  # Column already exists or table already altered
+
+    # One-time purge of ST Peter's Farm and Gift Amadi account to enable clean onboarding
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM alerts WHERE farm_id IN (SELECT id FROM farms WHERE LOWER(name) LIKE '%peter%' OR LOWER(farmer_email) LIKE '%huomagift%')"))
+            conn.execute(text("DELETE FROM risk_events WHERE farm_id IN (SELECT id FROM farms WHERE LOWER(name) LIKE '%peter%' OR LOWER(farmer_email) LIKE '%huomagift%')"))
+            conn.execute(text("DELETE FROM farmer_reports WHERE farm_id IN (SELECT id FROM farms WHERE LOWER(name) LIKE '%peter%' OR LOWER(farmer_email) LIKE '%huomagift%')"))
+            conn.execute(text("DELETE FROM farms WHERE LOWER(name) LIKE '%peter%' OR LOWER(farmer_email) LIKE '%huomagift%'"))
+            try:
+                conn.execute(text("DELETE FROM users WHERE LOWER(email) LIKE '%huomagift%'"))
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Purge error during init_db: {e}")
 
 
 def get_db():
