@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class FarmCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     owner_name: Optional[str] = Field(None, max_length=200)
+    user_id: Optional[str] = None
     farmer_email: Optional[str] = Field(None, max_length=255)
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
@@ -24,6 +25,7 @@ class FarmOut(BaseModel):
     id: str
     name: str
     owner_name: Optional[str]
+    user_id: Optional[str] = None
     farmer_email: Optional[str] = None
     latitude: float
     longitude: float
@@ -111,6 +113,22 @@ class SweepResultOut(BaseModel):
     risks_found: int
     alerts_created_or_updated: int
     timestamp: datetime
+    scope: Optional[str] = None
+    diagnostics: Optional[dict] = None
+
+
+class MonitoringDiagnosticsOut(BaseModel):
+    last_successful_refresh: Optional[str] = None
+    next_scheduled_refresh: Optional[str] = None
+    open_meteo_request_count: int = 0
+    occurrences_429: int = 0
+    failed_farms: list = []
+    failed_farms_count: int = 0
+    cached_data_usage_count: int = 0
+    total_snapshots: int = 0
+    fresh_snapshots_count: int = 0
+    stale_snapshots_count: int = 0
+    refresh_interval_hours: int = 24
 
 
 class FarmerReportCreate(BaseModel):

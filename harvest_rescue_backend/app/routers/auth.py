@@ -18,7 +18,7 @@ def get_current_user_from_header(
     Extracts and validates Bearer token from Authorization header.
     Returns User if valid, None otherwise.
     """
-    if not authorization:
+    if not authorization or not isinstance(authorization, str):
         return None
     
     parts = authorization.strip().split()

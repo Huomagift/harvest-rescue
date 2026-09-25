@@ -21,6 +21,13 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://postgres.wfthbfougrgbhzsbgzmp:SjH77*9YqpsWU.*@aws-1-eu-west-1.pooler.supabase.com:5432/postgres"
 
+    # Email notifications (Gmail SMTP default)
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property

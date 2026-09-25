@@ -151,6 +151,14 @@ export const api = {
     });
   },
 
+  sendTestEmail: (
+    farmId: string
+  ): Promise<{ success: boolean; recipient: string; method: string; message: string; subject?: string }> => {
+    return apiFetch(`/farms/${farmId}/send-test-email`, {
+      method: "POST",
+    });
+  },
+
   // Risk endpoints
   evaluateRisk: (farmId: string): Promise<RiskEvent[]> => {
     return apiFetch<RiskEvent[]>(`/risk/${farmId}/evaluate`, {
@@ -166,10 +174,18 @@ export const api = {
     return apiFetch<SignalResponse>(`/risk/${farmId}/signals`);
   },
 
-  triggerSweep: (): Promise<SweepResult> => {
-    return apiFetch<SweepResult>("/risk/sweep", {
+  triggerSweep: (scope?: string, forceRefresh?: boolean): Promise<SweepResult> => {
+    const params = new URLSearchParams();
+    if (scope) params.set("scope", scope);
+    if (forceRefresh) params.set("force_refresh", "true");
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<SweepResult>(`/risk/sweep${qs}`, {
       method: "POST",
     });
+  },
+
+  getDiagnostics: (): Promise<any> => {
+    return apiFetch<any>("/risk/diagnostics");
   },
 
   // Alert endpoints

@@ -62,6 +62,14 @@ export const FarmDashboardView: React.FC<FarmDashboardViewProps> = ({
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
+  const [emailResult, setEmailResult] = useState<{
+    success: boolean;
+    recipient?: string;
+    method?: string;
+    message: string;
+    subject?: string;
+  } | null>(null);
 
   const fetchRiskData = async (farmId: string) => {
     setIsLoading(true);
@@ -110,6 +118,24 @@ export const FarmDashboardView: React.FC<FarmDashboardViewProps> = ({
       setError(err.message || "Failed to complete risk assessment.");
     } finally {
       setIsEvaluating(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!farm?.id) return;
+    setIsSendingEmail(true);
+    setEmailResult(null);
+    try {
+      const res = await api.sendTestEmail(farm.id);
+      setEmailResult(res);
+    } catch (err: any) {
+      setEmailResult({
+        success: false,
+        method: "error",
+        message: err.message || "Failed to trigger risk alert test email.",
+      });
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -207,6 +233,52 @@ export const FarmDashboardView: React.FC<FarmDashboardViewProps> = ({
         </div>
       )}
 
+      {/* Test Email Result Banner */}
+      {emailResult && (
+        <div
+          className={`p-4 rounded-2xl border text-sm flex items-start justify-between gap-3 shadow-xs transition-all ${
+            emailResult.success && emailResult.method === "smtp"
+              ? "bg-[#D8ECE0] border-[#A3D9B5] text-[#052119]"
+              : emailResult.success
+              ? "bg-[#FFF8E1] border-[#FFE082] text-[#5D4037]"
+              : "bg-[#FFDAD6] border-[#FFB4AB] text-[#410E0B]"
+          }`}
+        >
+          <div className="flex items-start gap-2.5">
+            {emailResult.success && emailResult.method === "smtp" ? (
+              <CheckCircle2 className="w-5 h-5 text-[#1B4D3E] shrink-0 mt-0.5" />
+            ) : emailResult.success ? (
+              <Mail className="w-5 h-5 text-[#E65100] shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-[#BA1A1A] shrink-0 mt-0.5" />
+            )}
+            <div className="space-y-1">
+              <div className="font-bold flex items-center gap-2">
+                <span>
+                  {emailResult.success && emailResult.method === "smtp"
+                    ? "Live Risk Email Dispatched via Gmail SMTP"
+                    : emailResult.success
+                    ? "Agronomic Risk Briefing Generated"
+                    : "Email Dispatch Advisory"}
+                </span>
+                {emailResult.recipient && (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/70">
+                    To: {emailResult.recipient}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm leading-relaxed">{emailResult.message}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setEmailResult(null)}
+            className="text-xs font-bold underline cursor-pointer shrink-0 mt-0.5"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Navigation Breadcrumb */}
       {onBackToOverview && (
         <button
@@ -288,6 +360,16 @@ export const FarmDashboardView: React.FC<FarmDashboardViewProps> = ({
           <Button
             variant="tonal"
             size="sm"
+            onClick={handleSendTestEmail}
+            isLoading={isSendingEmail}
+            leftIcon={<Mail className="w-4 h-4 text-[#1B4D3E]" />}
+            title={farm.farmer_email ? `Send test agronomic email to ${farm.farmer_email}` : "Send test email"}
+          >
+            Test Email
+          </Button>
+          <Button
+            variant="tonal"
+            size="sm"
             onClick={() => setIsReportModalOpen(true)}
             leftIcon={<FileText className="w-4 h-4" />}
           >
@@ -342,6 +424,75 @@ export const FarmDashboardView: React.FC<FarmDashboardViewProps> = ({
         <div className="text-[11px] text-[#717973] shrink-0">
           Last assessment: <strong>{lastMonitoredText}</strong>
         </div>
+      </div>
+
+      {/* COMPOUNDED EMAIL RISK CHANNEL CARD */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-white border border-[#E0E4DF] shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E0E4DF]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-[#D8ECE0] text-[#1B4D3E] flex items-center justify-center shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#1B4D3E] block">
+                Farmer Email Notification Channel
+              </span>
+              <h3 className="text-base sm:text-lg font-bold text-[#191C1A]">
+                Compounded Risk Early Warning System
+              </h3>
+            </div>
+          </div>
+          <Button
+            variant="filled"
+            size="sm"
+            onClick={handleSendTestEmail}
+            isLoading={isSendingEmail}
+            leftIcon={<Mail className="w-4 h-4" />}
+            className="self-start sm:self-center"
+          >
+            Send Test Alert Email
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3.5 rounded-2xl bg-[#F0F4EF] space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#717973] block">
+              Recipient Email
+            </span>
+            <span className="font-bold text-[#191C1A] text-sm break-all">
+              {farm.farmer_email || "Not specified"}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#F0F4EF] space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#717973] block">
+              Dispatch Policy
+            </span>
+            <span className="font-semibold text-[#191C1A] text-xs">
+              Compounded once per threat cycle (prevents alert fatigue)
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#F0F4EF] space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#717973] block">
+              Last Dispatched Alert
+            </span>
+            <span className="font-semibold text-[#191C1A] text-xs">
+              {farm.last_email_notification_at
+                ? new Date(farm.last_email_notification_at).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "No email dispatched yet"}
+            </span>
+          </div>
+        </div>
+
+        <p className="text-xs text-[#717973]">
+          Alerts are automatically triggered when Sentinel-2 satellite or meteorological data detects elevated risk (e.g. soil saturation, precipitation spikes, or canopy vigor decline). Notifications are compounded into a single actionable briefing to protect farmers from message fatigue.
+        </p>
       </div>
 
       {/* GOOGLE EARTH-STYLE FARM VIEW — Large, Immersive Aerial Visualization */}

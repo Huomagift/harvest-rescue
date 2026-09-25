@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Farm, Alert } from "@/lib/types";
-import { UserProfile } from "@/lib/api";
+import { UserProfile, api } from "@/lib/api";
 import { Button } from "../ui/Button";
 import {
   Sprout,
@@ -17,6 +17,8 @@ import {
   Bell,
   Activity,
   Compass,
+  Mail,
+  CheckCircle2,
 } from "lucide-react";
 
 export interface FarmerOverviewViewProps {
@@ -38,6 +40,30 @@ export const FarmerOverviewView: React.FC<FarmerOverviewViewProps> = ({
   onDeleteFarm,
   onOpenAlerts,
 }) => {
+  const [testingFarmId, setTestingFarmId] = useState<string | null>(null);
+  const [emailMessage, setEmailMessage] = useState<{ farmId: string; success: boolean; message: string } | null>(null);
+
+  const handleQuickTestEmail = async (farm: Farm) => {
+    setTestingFarmId(farm.id);
+    setEmailMessage(null);
+    try {
+      const res = await api.sendTestEmail(farm.id);
+      setEmailMessage({
+        farmId: farm.id,
+        success: res.success,
+        message: res.message,
+      });
+    } catch (err: any) {
+      setEmailMessage({
+        farmId: farm.id,
+        success: false,
+        message: err.message || "Failed to trigger test email",
+      });
+    } finally {
+      setTestingFarmId(null);
+    }
+  };
+
   const unreadAlerts = alerts.filter((a) => a.status === "unread");
   const totalHectares = farms.reduce((sum, f) => sum + (f.size_hectares || 0), 0);
   const farmMap = new Map(farms.map((f) => [f.id, f]));
@@ -257,7 +283,39 @@ export const FarmerOverviewView: React.FC<FarmerOverviewViewProps> = ({
                           <span>Planted {farm.planting_date}</span>
                         </span>
                       )}
+                      {farm.farmer_email && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#E8F5E9] text-[#1B4D3E] font-medium text-xs">
+                          <Mail className="w-3 h-3" />
+                          <span>{farm.farmer_email}</span>
+                        </span>
+                      )}
                     </div>
+
+                    {/* Email Test Feedback Banner */}
+                    {emailMessage?.farmId === farm.id && (
+                      <div
+                        className={`p-3 rounded-2xl text-xs flex items-start justify-between gap-2 animate-in fade-in duration-150 ${
+                          emailMessage.success
+                            ? "bg-[#D8ECE0] text-[#052119] border border-[#A3D9B5]"
+                            : "bg-[#FFDAD6] text-[#410E0B] border border-[#FFB4AB]"
+                        }`}
+                      >
+                        <div className="flex items-start gap-1.5">
+                          {emailMessage.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-[#1B4D3E] shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 text-[#BA1A1A] shrink-0 mt-0.5" />
+                          )}
+                          <span className="leading-snug">{emailMessage.message}</span>
+                        </div>
+                        <button
+                          onClick={() => setEmailMessage(null)}
+                          className="font-bold underline cursor-pointer text-[10px] shrink-0"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}
@@ -270,6 +328,18 @@ export const FarmerOverviewView: React.FC<FarmerOverviewViewProps> = ({
                       className="font-bold text-xs flex-1 justify-center"
                     >
                       Open Parcel Monitoring
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="tonal"
+                      onClick={() => handleQuickTestEmail(farm)}
+                      isLoading={testingFarmId === farm.id}
+                      leftIcon={<Mail className="w-3.5 h-3.5" />}
+                      className="text-xs shrink-0"
+                      title={farm.farmer_email ? `Test email delivery to ${farm.farmer_email}` : "Test alert email"}
+                    >
+                      Test Email
                     </Button>
 
                     <button

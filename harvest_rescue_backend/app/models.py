@@ -17,6 +17,7 @@ class Farm(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     name = Column(String, nullable=False)
     owner_name = Column(String, nullable=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     elevation = Column(Float, nullable=True)
@@ -35,6 +36,7 @@ class Farm(Base):
 
     risk_events = relationship("RiskEvent", back_populates="farm", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="farm", cascade="all, delete-orphan")
+    environmental_snapshot = relationship("EnvironmentalSnapshot", back_populates="farm", uselist=False, cascade="all, delete-orphan")
 
 
 class RiskEvent(Base):
@@ -88,5 +90,24 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     auth_token = Column(String, index=True, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class EnvironmentalSnapshot(Base):
+    __tablename__ = "environmental_snapshots"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    farm_id = Column(String, ForeignKey("farms.id", ondelete="CASCADE"), nullable=True, unique=True, index=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    data = Column(JSON, nullable=False)
+    raw_daily = Column(JSON, nullable=True)
+    fetched_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    status = Column(String, nullable=False, default="fresh")  # "fresh" | "stale" | "error"
+    is_demo = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    farm = relationship("Farm", back_populates="environmental_snapshot")
 
 

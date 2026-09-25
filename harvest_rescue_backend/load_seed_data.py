@@ -63,6 +63,7 @@ try:
         db.query(models.Alert).filter(models.Alert.farm_id == ob.id).delete()
         db.query(models.RiskEvent).filter(models.RiskEvent.farm_id == ob.id).delete()
         db.query(models.FarmerReport).filter(models.FarmerReport.farm_id == ob.id).delete()
+        db.query(models.EnvironmentalSnapshot).filter(models.EnvironmentalSnapshot.farm_id == ob.id).delete()
         db.delete(ob)
 
     # 3. Clean up any anonymous test farms without owner/email
@@ -74,9 +75,18 @@ try:
         db.query(models.Alert).filter(models.Alert.farm_id == an.id).delete()
         db.query(models.RiskEvent).filter(models.RiskEvent.farm_id == an.id).delete()
         db.query(models.FarmerReport).filter(models.FarmerReport.farm_id == an.id).delete()
+        db.query(models.EnvironmentalSnapshot).filter(models.EnvironmentalSnapshot.farm_id == an.id).delete()
         db.delete(an)
 
     db.commit()
+
+    # 4. Batch refresh environmental snapshots for all benchmark demo farms in ONE batched call
+    print("Pre-warming environmental snapshot cache for benchmark demo farms...")
+    from app.services.environmental_service import batch_refresh_farms
+    active_demos = db.query(models.Farm).filter(models.Farm.is_demo == True).all()
+    refresh_result = batch_refresh_farms(db, active_demos)
+    print(f"Benchmark snapshots ready: {refresh_result['refreshed_count']} refreshed, {refresh_result['cached_fresh_count']} cached.")
+
     print("Database sync completed. 5 benchmark demo farms active, user farms preserved.")
 finally:
     db.close()

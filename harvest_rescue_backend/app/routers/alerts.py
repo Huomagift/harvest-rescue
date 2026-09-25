@@ -3,6 +3,7 @@ Alerts management endpoints protected by X-API-Key authentication.
 """
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -34,8 +35,16 @@ def list_alerts(
     if status:
         query = query.filter(models.Alert.status == status)
 
-    if target_email:
+    if user:
         # Authenticated user mode: ONLY alerts belonging to this farmer's private registered farms
+        query = query.filter(
+            or_(
+                models.Farm.user_id == user.id,
+                models.Farm.farmer_email == user.email,
+            ),
+            models.Farm.is_demo == False,
+        )
+    elif target_email:
         query = query.filter(models.Farm.farmer_email == target_email, models.Farm.is_demo == False)
     elif is_demo is True or target_email is None:
         # Visitor mode: ONLY demo benchmark alerts

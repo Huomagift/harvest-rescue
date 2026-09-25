@@ -163,4 +163,22 @@ export interface SignalResponse {
     source: string;
   };
   last_monitored_at?: string | null;
+  data_freshness?: "fresh" | "stale" | string;
+  fetched_at?: string | null;
+  expires_at?: string | null;
+  cached?: boolean;
+}
+
+export interface MonitoringDiagnostics {
+  last_successful_refresh?: string | null;
+  next_scheduled_refresh?: string | null;
+  open_meteo_request_count: number;
+  occurrences_429: number;
+  failed_farms: any[];
+  failed_farms_count: number;
+  cached_data_usage_count: number;
+  total_snapshots: number;
+  fresh_snapshots_count: number;
+  stale_snapshots_count: number;
+  refresh_interval_hours: number;
 }
